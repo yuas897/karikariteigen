@@ -237,6 +237,38 @@
                 font-size: 22px;
             }
         }
+
+        .download-options {
+            background: #f7fafc;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .format-selector, .quality-selector {
+            margin-bottom: 10px;
+        }
+
+        .format-selector label, .quality-selector label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-right: 10px;
+        }
+
+        .format-selector select {
+            padding: 6px 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+        }
+
+        .image-size-info {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -287,6 +319,21 @@
                     <div class="canvas-title">調整後</div>
                     <canvas id="processedCanvas"></canvas>
                 </div>
+            </div>
+
+            <div class="download-options">
+                <div class="format-selector">
+                    <label for="formatSelect">保存形式:</label>
+                    <select id="formatSelect">
+                        <option value="png">PNG（ロスレス・最高品質）</option>
+                        <option value="jpeg">JPEG（高品質・小サイズ）</option>
+                    </select>
+                </div>
+                <div class="quality-selector" id="qualitySelector" style="display:none;">
+                    <label for="jpegQuality">JPEG品質: <span id="qualityValue">100</span>%</label>
+                    <input type="range" id="jpegQuality" min="80" max="100" value="100">
+                </div>
+                <div id="imageSizeInfo" class="image-size-info"></div>
             </div>
 
             <div class="button-group">
@@ -368,6 +415,7 @@
                     setupCanvases();
                     controls.classList.add('active');
                     canvasContainer.classList.add('active');
+                    updateSizeInfo();
                     processImage();
                 };
                 originalImage.src = e.target.result;
@@ -505,12 +553,46 @@
             processImage();
         });
 
-        // ダウンロード
+        // ダウンロードオプション
+        const formatSelect = document.getElementById('formatSelect');
+        const qualitySelector = document.getElementById('qualitySelector');
+        const jpegQuality = document.getElementById('jpegQuality');
+        const qualityValue = document.getElementById('qualityValue');
+        const imageSizeInfo = document.getElementById('imageSizeInfo');
+
+        formatSelect.addEventListener('change', () => {
+            qualitySelector.style.display = formatSelect.value === 'jpeg' ? 'block' : 'none';
+            updateSizeInfo();
+        });
+
+        jpegQuality.addEventListener('input', (e) => {
+            qualityValue.textContent = e.target.value;
+        });
+
+        function updateSizeInfo() {
+            if (!originalImage) return;
+            imageSizeInfo.textContent = `元画像: ${originalImage.width} × ${originalImage.height}px — ダウンロード画像も同一解像度で出力されます`;
+        }
+
+        // ダウンロード（toBlob使用で高品質出力）
         downloadBtn.addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.download = 'iphone-adjusted-' + Date.now() + '.jpg';
-            link.href = processedCanvas.toDataURL('image/jpeg', 0.98);
-            link.click();
+            const format = formatSelect.value;
+            const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
+            const quality = format === 'jpeg' ? parseInt(jpegQuality.value) / 100 : undefined;
+            const ext = format === 'png' ? 'png' : 'jpg';
+
+            processedCanvas.toBlob((blob) => {
+                if (!blob) {
+                    alert('ダウンロードに失敗しました。');
+                    return;
+                }
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `adjusted-${Date.now()}.${ext}`;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+            }, mimeType, quality);
         });
 
         // リセット
